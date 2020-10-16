@@ -1,2 +1,2 @@
 # Dr.Prenation
-Disease prediction
+Seasonal disease prediction
