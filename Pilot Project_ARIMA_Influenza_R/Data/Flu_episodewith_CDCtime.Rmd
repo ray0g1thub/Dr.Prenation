@@ -1,0 +1,48 @@
+---
+title: "流感病程資料處理"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 流感重症病程資料準備
+
+### 匯入套件
+
+```{r }
+library(data.table)
+library(lubridate)
+library(knitr)
+```
+
+### 取各病程第一筆資料做為episode的起始日和結束日
+
+```{r }
+total_Flu_episode_new<-readRDS('total_Flu_episode_new.rds')
+firstrow_totalepisode<-total_Flu_episode_new[,.SD[1],by = episodeno]
+#saveRDS(firstrow_totalepisode,'firstrow_totalepisode.rds')
+knitr::kable(head(firstrow_totalepisode))
+```
+
+### 串接疾管署的年週對照表
+```{r }
+Flu_start_end<-firstrow_totalepisode[,c(1,2,6,7,19,20),with = F]
+CDC_Time<-fread('CopyOfCDC_Time1.csv')
+CDC_Time$CDC_date<-ymd(CDC_Time$CDC_date)
+colnames(CDC_Time)[1]<-"startday"
+Flu_start_end<-merge(Flu_start_end,CDC_Time,by = "startday",all.x = T)
+Flu_start_end<-Flu_start_end[,c(2:5,1,6:8),with =F]
+knitr::kable(head(Flu_start_end))
+#saveRDS(Flu_start_end,"Flu_start_end.rds")
+```
+
+### 取欲分析的2010-2015年資料
+
+```{r}
+Flu_2010to2015_EPISODEwithCDC<-Flu_start_end[CDC_year%in%c(2010:2015)]
+knitr::kable(head(Flu_start_end))
+#saveRDS(Flu_2010to2015_EPISODEwithCDC,'Flu_2010to2015_EPISODEwithCDC.rds')
+```
+

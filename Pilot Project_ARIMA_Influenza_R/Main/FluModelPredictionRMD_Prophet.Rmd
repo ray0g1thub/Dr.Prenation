@@ -1,0 +1,285 @@
+---
+title: "Flu Prediction models for Linkou and Kaohsiung Branch_Prophet"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##匯入套件Import Library
+```{r }
+library(data.table)
+library(forecast)
+library(prophet)
+library(MLmetrics)
+```
+
+
+## 林口院區資料Episode Data from Linkou Branch
+```{r }
+Flu_Linkou_313<-readRDS('Flu_Linkou_313.rds')
+CDC_yearweek_data<-readRDS('CDC_yearweek_data.rds')
+CDC_yearweek_data_firstdayofweek<-CDC_yearweek_data[,.SD[c(1)],year_week_CDC]
+Flu_Linkou_313<-merge(Flu_Linkou_313,CDC_yearweek_data_firstdayofweek[,c(1,4),with=F])
+
+Flu_Linkou_313$Log_N<-log10((Flu_Linkou_313$N)+1)
+Linkou_Test_week<-Flu_Linkou_313[,c('startday','Log_N'),with = F]
+colnames(Linkou_Test_week)<-c('ds','y')
+```
+
+### Function for Model Evaluation 
+```{r }
+model_evaluaion <- function(prediction, real) {
+  MAE_value<-round(MAE(prediction,real) ,digits=2)
+  MAPE_value <- round(MAPE(prediction,real)*100 ,digits=1)
+  RMSE_value <- round(RMSE(prediction,real) ,digits=2)
+  RMSPE_value <- round(RMSPE(prediction,real)*100 ,digits=1)
+   print(paste("MAE:",MAE_value," MAPE:",MAPE_value,
+               " RMSE:",RMSE_value," RMSPE:",RMSPE_value))
+}
+```
+
+### 每週更新模型_林口 Updating Interval: Weekly (Linkou)
+```{r }
+Linkou_Test_prediction_week<-NULL
+for (i in c(1:52)){
+  Linkou_Test_week$floor<-0
+  
+  m <- prophet(Linkou_Test_week[1:(260+i),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 1,freq = 'week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Linkou_Test_prediction_week <- rbind(Linkou_Test_prediction_week,forecast)
+}
+Linkou_Test_prediction_week$anti_yhat<-(10^Linkou_Test_prediction_week$yhat)-1
+
+Linkou_Test_prediction_week$year_week_no<-262:313
+Linkou_Test_prediction_week<-data.table(Linkou_Test_prediction_week)
+
+saveRDS(Linkou_Test_prediction_week[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Weekly_Linkou.rds')
+
+#model_evaluation
+model_evaluaion(Linkou_Test_prediction_week$anti_yhat,Flu_Linkou_313[262:313]$N)
+
+```
+
+### 每月更新模型_林口 Updating Interval: Monthly (Linkou)
+```{r}
+Linkou_Test_month<-Flu_Linkou_313[,c('startday','Log_N'),with = F]
+colnames(Linkou_Test_month)<-c('ds','y')
+Linkou_Test_prediction_month<-NULL
+
+for (i in c(1:13)){
+  Linkou_Test_month$floor<-0
+  
+  m <- prophet(Linkou_Test_month[1:(261+4*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 4,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Linkou_Test_prediction_month<-rbind(Linkou_Test_prediction_month,forecast)
+}
+
+Linkou_Test_prediction_month$anti_yhat<-(10^Linkou_Test_prediction_month$yhat)-1
+
+Linkou_Test_prediction_month$year_week_no<-262:313
+Linkou_Test_prediction_month<-data.table(Linkou_Test_prediction_month)
+
+saveRDS(Linkou_Test_prediction_month[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Monthly_Linkou.rds')
+
+#model_evaluation
+model_evaluaion(Linkou_Test_prediction_month$anti_yhat,Flu_Linkou_313[262:313]$N)
+```
+
+
+### 每季更新模型_林口 Updating Interval:Quarterly (Linkou)
+```{r}
+Linkou_Test_seasonal<-Flu_Linkou_313[,c('startday','Log_N'),with = F]
+colnames(Linkou_Test_seasonal)<-c('ds','y')
+Linkou_Test_prediction_seasonal<-NULL
+
+for (i in c(1:4)){
+  Linkou_Test_seasonal$floor<-0
+  
+  m <- prophet(Linkou_Test_seasonal[1:(261+13*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 13,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Linkou_Test_prediction_seasonal<-rbind(Linkou_Test_prediction_seasonal,forecast)
+}
+
+Linkou_Test_prediction_seasonal$anti_yhat<-(10^Linkou_Test_prediction_seasonal$yhat)-1
+
+Linkou_Test_prediction_seasonal$year_week_no<-262:313
+Linkou_Test_prediction_seasonal<-data.table(Linkou_Test_prediction_seasonal)
+
+saveRDS(Linkou_Test_prediction_seasonal[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Quarterly_Linkou.rds')
+
+#model_evaluation
+model_evaluaion(Linkou_Test_prediction_seasonal$anti_yhat,Flu_Linkou_313[262:313]$N)
+
+```
+
+### 每年更新模型_林口 Updating Interval: Yearly (Linkou)
+```{r}
+Linkou_Test_yearly<-Flu_Linkou_313[,c('startday','Log_N'),with = F]
+colnames(Linkou_Test_yearly)<-c('ds','y')
+Linkou_Test_prediction_yearly<-NULL
+
+for (i in c(1:1)){
+  Linkou_Test_yearly$floor<-0
+  
+  m <- prophet(Linkou_Test_yearly[1:(261+52*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 52,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Linkou_Test_prediction_yearly<-rbind(Linkou_Test_prediction_yearly,forecast)
+}
+
+Linkou_Test_prediction_yearly$anti_yhat<-(10^Linkou_Test_prediction_yearly$yhat)-1
+
+Linkou_Test_prediction_yearly$year_week_no<-262:313
+Linkou_Test_prediction_yearly<-data.table(Linkou_Test_prediction_yearly)
+
+saveRDS(Linkou_Test_prediction_yearly[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Yearly_Linkou.rds')
+
+#model_evaluation
+model_evaluaion(Linkou_Test_prediction_yearly$anti_yhat,Flu_Linkou_313[262:313]$N)
+
+```
+
+<hr>
+
+## 高雄院區資料Episode Data from Kaohsiung Branch
+
+```{r }
+Flu_Kaohsiung_313<-readRDS('Flu_Kaohsiung_313.rds')
+Flu_Kaohsiung_313<-rbind(Flu_Kaohsiung_313,data.table(year_week_CDC="2014_47",N=0),fill=T)
+Flu_Kaohsiung_313<-Flu_Kaohsiung_313[order(year_week_CDC)]
+CDC_yearweek_data<-readRDS('CDC_yearweek_data.rds')
+CDC_yearweek_data_firstdayofweek<-CDC_yearweek_data[,.SD[c(1)],year_week_CDC]
+Flu_Kaohsiung_313<-merge(Flu_Kaohsiung_313,CDC_yearweek_data_firstdayofweek[,c(1,4),with=F])
+
+Flu_Kaohsiung_313$Log_N<-log10((Flu_Kaohsiung_313$N)+1)
+
+```
+
+### 每週更新模型_高雄 Updating Interval: Weekly (Kaohsiung)
+```{r}
+Kao_Test_week<-Flu_Kaohsiung_313[,c('startday','Log_N'),with = F]
+colnames(Kao_Test_week)<-c('ds','y')
+Kao_Test_week$year_week_no<-1:313
+Kao_Test_prediction_week<-NULL
+for (i in c(1:52)){
+  Kao_Test_week$floor<-0
+  
+  m <- prophet(Kao_Test_week[1:(260+i),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 1,freq = 'week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Kao_Test_prediction_week <- rbind(Kao_Test_prediction_week,forecast)
+}
+Kao_Test_prediction_week$anti_yhat<-(10^Kao_Test_prediction_week$yhat)-1
+
+Kao_Test_prediction_week$year_week_no<-262:313
+Kao_Test_prediction_week<-data.table(Kao_Test_prediction_week)
+
+saveRDS(Kao_Test_prediction_week[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Weekly_Kaohsiung.rds')
+
+#model_evaluation
+model_evaluaion(Kao_Test_prediction_week$anti_yhat,Flu_Kaohsiung_313[262:313]$N)
+```
+
+
+
+### 每月更新模型_高雄 Updating Interval: Monthly (Kaohsiung)
+```{r}
+
+Kao_Test_month<-Flu_Kaohsiung_313[,c('startday','Log_N'),with = F]
+colnames(Kao_Test_month)<-c('ds','y')
+Kao_Test_prediction_month<-NULL
+
+for (i in c(1:13)){
+  Kao_Test_month$floor<-0
+  
+  m <- prophet(Kao_Test_month[1:(261+4*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 4,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Kao_Test_prediction_month<-rbind(Kao_Test_prediction_month,forecast)
+}
+
+Kao_Test_prediction_month$anti_yhat<-(10^Kao_Test_prediction_month$yhat)-1
+
+Kao_Test_prediction_month$year_week_no<-262:313
+Kao_Test_prediction_month<-data.table(Kao_Test_prediction_month)
+
+saveRDS(Kao_Test_prediction_month[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Monthly_Kaohsiung.rds')
+
+#model_evaluation
+model_evaluaion(Kao_Test_prediction_month$anti_yhat,Flu_Kaohsiung_313[262:313]$N)
+```
+
+### 每季更新模型_高雄 Updating Interval: Quarterly (Kaohsiung)
+```{r}
+
+Kao_Test_seasonal<-Flu_Kaohsiung_313[,c('startday','Log_N'),with = F]
+colnames(Kao_Test_seasonal)<-c('ds','y')
+Kao_Test_prediction_seasonal<-NULL
+
+for (i in c(1:4)){
+  Kao_Test_seasonal$floor<-0
+  
+  m <- prophet(Kao_Test_seasonal[1:(261+13*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 13,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Kao_Test_prediction_seasonal<-rbind(Kao_Test_prediction_seasonal,forecast)
+}
+
+Kao_Test_prediction_seasonal$anti_yhat<-(10^Kao_Test_prediction_seasonal$yhat)-1
+
+Kao_Test_prediction_seasonal$year_week_no<-262:313
+Kao_Test_prediction_seasonal<-data.table(Kao_Test_prediction_seasonal)
+
+saveRDS(Kao_Test_prediction_seasonal[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Quarterly_Kaohsiung.rds')
+
+#model_evaluation
+model_evaluaion(Kao_Test_prediction_seasonal$anti_yhat,Flu_Kaohsiung_313[262:313]$N)
+```
+
+### 每年更新模型_高雄 Updating Interval: Yearly (Kaohsiung)
+```{r}
+Kao_Test_yearly<-Flu_Kaohsiung_313[,c('startday','Log_N'),with = F]
+colnames(Kao_Test_yearly)<-c('ds','y')
+Kao_Test_prediction_yearly<-NULL
+
+for (i in c(1:1)){
+  Kao_Test_yearly$floor<-0
+  
+  m <- prophet(Kao_Test_yearly[1:(261+52*(i-1)),],changepoint.prior.scale = 0.1)
+  
+  future<-make_future_dataframe(m,periods = 52,freq='week',include_history = F)
+  future$floor<-0
+  forecast <- predict(m, future)
+  Kao_Test_prediction_yearly<-rbind(Kao_Test_prediction_yearly,forecast)
+}
+
+Kao_Test_prediction_yearly$anti_yhat<-(10^Kao_Test_prediction_yearly$yhat)-1
+
+Kao_Test_prediction_yearly$year_week_no<-262:313
+Kao_Test_prediction_yearly<-data.table(Kao_Test_prediction_yearly)
+
+saveRDS(Kao_Test_prediction_yearly[,c('year_week_no','anti_yhat'),with=F],'Flu_Prophet_Yearly_Kaohsiung.rds')
+
+#model_evaluation
+model_evaluaion(Kao_Test_prediction_yearly$anti_yhat,Flu_Kaohsiung_313[262:313]$N)
+
+```
